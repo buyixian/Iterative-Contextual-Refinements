@@ -1,0 +1,499 @@
+<!-- [OVERHAUL] index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iterative Studio</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <link rel="stylesheet" href="index.css">
+    <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.4.0",
+    "diff": "https://esm.sh/diff@^8.0.2",
+    "jszip": "https://esm.sh/jszip@^3.10.1",
+    "marked": "https://esm.sh/marked@4.3.0",
+    "dompurify": "https://esm.sh/dompurify@3.1.6",
+    "highlight.js": "https://esm.sh/highlight.js@11.9.0"
+  }
+}
+</script>
+</head>
+<body>
+    <div id="preloader">
+        <div class="spinner"></div>
+    </div>
+    <div class="background-container">
+        <div class="background-gradient"></div>
+        <div class="background-noise"></div>
+    </div>
+
+    <div id="root">
+        <div id="app-container">
+            <aside id="controls-sidebar" class="inspector-panel custom-scrollbar" aria-labelledby="controls-sidebar-heading">
+                <header class="sidebar-header">
+                    <p id="api-key-status" class="api-key-status-message status-badge" aria-live="polite">Initializing...</p>
+                    <div id="api-key-form-container" style="display: none; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                        <input type="password" id="api-key-input" class="input-base" placeholder="Enter API Key">
+                        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                            <button id="save-api-key-button" class="button"><span class="material-symbols-outlined">save</span><span class="button-text">Save Key</span></button>
+                            <button id="clear-api-key-button" class="button"><span class="material-symbols-outlined">delete</span><span class="button-text">Clear Key</span></button>
+                        </div>
+                    </div>
+                </header>
+                
+                <div class="sidebar-content">
+                    <div class="input-group">
+                        <label for="initial-idea" id="initial-idea-label" class="input-label">Your Request:</label>
+                        <textarea id="initial-idea" class="input-base" placeholder="E.g., a personal blog about cooking..." rows="5"></textarea>
+                    </div>
+        
+                    <div id="math-problem-image-input-container" class="input-group" style="display: none;">
+                        <label class="input-label">Upload Image (Optional):</label>
+                        <label for="math-problem-image-input" class="file-drop-area">
+                            <span class="material-symbols-outlined file-drop-icon">upload_file</span>
+                            <span class="file-drop-message">Drag &amp; drop an image here, or click to select a file</span>
+                            <input type="file" id="math-problem-image-input" class="sr-only" accept="image/png, image/jpeg, image/webp">
+                        </label>
+                        <img id="math-problem-image-preview" src="#" alt="Image preview" style="display: none; max-width: 100%; height: auto; border-radius: var(--border-radius-md); margin-top: 1rem;"/>
+                    </div>
+        
+                    <div class="input-group">
+                        <label class="input-label">Application Mode</label>
+                        <div id="app-mode-selector" class="radio-group-modern" role="radiogroup" aria-label="Select Application Mode">
+                           <label class="radio-label-modern">
+                                <input type="radio" name="appMode" value="website" checked>
+                                <span>HTML</span>
+                            </label>
+                            <label class="radio-label-modern">
+                                <input type="radio" name="appMode" value="creative">
+                                <span>Writing</span>
+                            </label>
+                            <label class="radio-label-modern">
+                                <input type="radio" name="appMode" value="math">
+                                <span>Math</span>
+                            </label>
+                            <label class="radio-label-modern">
+                                <input type="radio" name="appMode" value="agent">
+                                <span>Agent</span>
+                            </label>
+                            <label class="radio-label-modern">
+                                <input type="radio" name="appMode" value="react">
+                                <span>React</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <details class="sidebar-section" open>
+                        <summary class="sidebar-section-header">Model & Variants</summary>
+                        <div class="sidebar-section-content">
+                            <div id="model-selection-container" class="input-group-tight">
+                                <label for="model-select" class="input-label">Model:</label>
+                                <select id="model-select" class="input-base" aria-label="Select Gemini Model">
+                                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                                </select>
+                            </div>
+                
+                            <div id="temperature-selection-container" class="input-group-tight">
+                                <label class="input-label" id="pipeline-select-heading">Variants (Temperature):</label>
+                                <div id="pipeline-selectors-container" class="pipeline-selectors-container" role="group" aria-labelledby="pipeline-select-heading">
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="sidebar-section">
+                        <summary class="sidebar-section-header">Configuration</summary>
+                        <div class="sidebar-section-content">
+                            <div class="config-buttons-container" style="display: flex; gap: 1rem;">
+                                <button id="export-config-button" class="button" type="button"><span class="material-symbols-outlined">upload</span><span class="button-text">Export</span></button>
+                                <input type="file" id="import-config-input" class="sr-only" accept=".json">
+                                <label for="import-config-input" id="import-config-label" class="button" role="button" tabindex="0">
+                                    <span class="material-symbols-outlined">download</span><span class="button-text">Import</span>
+                                </label>
+                            </div>
+                        </div>
+                    </details>
+                    
+                    <div id="custom-prompts-section" class="sidebar-section">
+                        <div id="customize-prompts-trigger" role="button" tabindex="0" class="sidebar-section-header">
+                            Customize Prompts
+                        </div>
+                    </div>
+
+                </div>
+
+                <footer class="sidebar-footer">
+                    <button id="generate-button" class="button primary-action" type="button"><span class="button-text">Generate</span></button>
+                </footer>
+            </aside>
+    
+            <main id="main-content" class="flow-canvas-wrapper" aria-labelledby="main-content-heading">
+                <h2 id="main-content-heading" class="sr-only">Generation Pipelines Output</h2>
+                <div id="tabs-nav-container" class="tabs-container" role="tablist" aria-label="Generation Variants">
+                    <!-- Tabs will be dynamically inserted here -->
+                </div>
+                <div id="pipelines-content-container" class="results-content-area custom-scrollbar">
+                    <!-- Pipeline content will be dynamically inserted here -->
+                </div>
+            </main>
+        </div>
+    </div>
+    
+       <!-- Prompts Modal -->
+    <div id="prompts-modal-overlay" class="modal-overlay">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="prompts-modal-title">
+            <header class="modal-header">
+                <h2 id="prompts-modal-title" class="modal-title">Customize Prompts</h2>
+                <button id="prompts-modal-close-button" class="modal-close-button" aria-label="Close Custom Prompts"><span class="material-symbols-outlined">close</span></button>
+            </header>
+            <div id="prompts-modal-body" class="modal-body">
+
+                <div id="prompts-modal-layout" class="prompts-modal-layout">
+                    <nav id="prompts-modal-nav" class="prompts-nav custom-scrollbar"></nav>
+                    <div id="prompts-modal-content" class="prompts-content custom-scrollbar">
+                        <!-- Website Prompts -->
+                        <div id="website-prompts-container" class="prompts-mode-container">
+                            <div class="prompt-content-pane" data-prompt-key="initial-gen">
+                                <h4 class="prompt-pane-title">Initial HTML Generation</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-initial-gen" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{initialIdea}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-initial-gen" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                             <div class="prompt-content-pane" data-prompt-key="initial-bugfix">
+                                <h4 class="prompt-pane-title">Initial HTML Bug Fix & Polish</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-initial-bugfix" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{initialIdea}}</code>, <code>{{rawHtml}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-initial-bugfix" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="initial-features">
+                                <h4 class="prompt-pane-title">Initial Feature Suggestion (HTML)</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-initial-features" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{initialIdea}}</code>, <code>{{currentHtml}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-initial-features" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="refine-implement">
+                                <h4 class="prompt-pane-title">Refinement - Stabilize & Implement</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-refine-implement" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{currentHtml}}</code>, <code>{{featuresToImplementStr}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-refine-implement" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="refine-bugfix">
+                                <h4 class="prompt-pane-title">Refinement - Bug Fix & Completion</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-refine-bugfix" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{rawHtml}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-refine-bugfix" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="refine-features">
+                                <h4 class="prompt-pane-title">Refinement - Feature Suggestion</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-refine-features" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{initialIdea}}</code>, <code>{{currentHtml}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-refine-features" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="final-polish">
+                                <h4 class="prompt-pane-title">Final Polish (HTML)</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-final-polish" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{currentHtml}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-final-polish" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="creative-prompts-container" class="prompts-mode-container">
+                            <div class="prompt-content-pane" data-prompt-key="creative-initial-draft">
+                                <h4 class="prompt-pane-title">Initial Draft Generation</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-creative-initial-draft" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{initialPremise}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-creative-initial-draft" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="creative-initial-critique">
+                                <h4 class="prompt-pane-title">Initial Critique & Suggestion</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-creative-initial-critique" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{currentDraft}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-creative-initial-critique" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="creative-refine-revise">
+                                <h4 class="prompt-pane-title">Refinement - Revise Draft</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-creative-refine-revise" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{currentDraft}}</code>, <code>{{critiqueToImplementStr}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-creative-refine-revise" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="creative-refine-critique">
+                                <h4 class="prompt-pane-title">Refinement - New Critique</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-creative-refine-critique" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{currentDraft}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-creative-refine-critique" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="creative-final-polish">
+                                <h4 class="prompt-pane-title">Final Polish (Creative Writing)</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-creative-final-polish" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{currentDraft}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-creative-final-polish" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="math-prompts-container" class="prompts-mode-container">
+                            <div class="prompt-content-pane" data-prompt-key="math-initial-strategy">
+                                <h4 class="prompt-pane-title">Initial Strategy Generation</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-math-initial-strategy" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{originalProblemText}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-math-initial-strategy" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="math-sub-strategy">
+                                <h4 class="prompt-pane-title">Sub-Strategy Generation</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-math-sub-strategy" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>...</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-math-sub-strategy" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="math-solution-attempt">
+                                <h4 class="prompt-pane-title">Solution Attempt</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-math-solution-attempt" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{originalProblemText}}</code>, <code>{{currentSubStrategy}}</code>, <code>{{knowledgePacket}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-math-solution-attempt" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="math-self-improvement">
+                                <h4 class="prompt-pane-title">Self-Improvement & Refinement</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-math-self-improvement" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{originalProblemText}}</code>, <code>{{currentSubStrategy}}</code>, <code>{{solutionAttempt}}</code>, <code>{{knowledgePacket}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-math-self-improvement" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="math-hypothesis-generation">
+                                <h4 class="prompt-pane-title">Hypothesis Generation</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-math-hypothesis-generation" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{originalProblemText}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-math-hypothesis-generation" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="math-prover">
+                                <h4 class="prompt-pane-title">Hypothesis Prover</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-math-prover" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{originalProblemText}}</code>, <code>{{hypothesis}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-math-prover" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                            <div class="prompt-content-pane" data-prompt-key="math-disprover">
+                                <h4 class="prompt-pane-title">Hypothesis Disprover</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-math-disprover" class="prompt-textarea" rows="8"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template</span>
+                                        <span class="prompt-placeholders">Variables: <code>{{originalProblemText}}</code>, <code>{{hypothesis}}</code></span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-math-disprover" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="agent-prompts-container" class="prompts-mode-container">
+                           <div class="prompt-content-pane" data-prompt-key="agent-judge-llm">
+                                <h4 class="prompt-pane-title">Agent Mode: Judge LLM Config</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction (for Judge LLM)</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-agent-judge-llm" class="prompt-textarea" rows="10"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template (for Judge LLM)</span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-agent-judge-llm" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="react-prompts-container" class="prompts-mode-container">
+                           <div class="prompt-content-pane" data-prompt-key="react-orchestrator">
+                                <h4 class="prompt-pane-title">React: Orchestrator Agent Config</h4>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header"><span class="prompt-card-title">System Instruction (for Orchestrator)</span></div>
+                                    <div class="prompt-card-body"><textarea id="sys-react-orchestrator" class="prompt-textarea" rows="10"></textarea></div>
+                                </div>
+                                <div class="prompt-card">
+                                    <div class="prompt-card-header">
+                                        <span class="prompt-card-title">User Prompt Template (for Orchestrator)</span>
+                                    </div>
+                                    <div class="prompt-card-body"><textarea id="user-react-orchestrator" class="prompt-textarea" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="index.tsx"></script>
+
+    <!-- Diff Viewer Modal -->
+    <div id="diff-modal-overlay" class="modal-overlay">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="diff-modal-title">
+            <header class="modal-header">
+                <h2 id="diff-modal-title" class="modal-title">Compare Outputs</h2>
+                <button id="diff-modal-close-button" class="modal-close-button" aria-label="Close Diff Viewer"><span class="material-symbols-outlined">close</span></button>
+            </header>
+            <div id="diff-modal-body">
+                <aside id="diff-selector-panel" class="inspector-panel custom-scrollbar">
+                    <div class="sidebar-section-content">
+                        <div id="diff-source-display" class="input-group">
+                            <h4 class="model-section-title">Source (A)</h4>
+                            <p id="diff-source-label">None selected</p>
+                        </div>
+                        <div class="input-group">
+                            <h4 class="model-section-title">Select Target (B)</h4>
+                            <div id="diff-target-tree" class="custom-scrollbar" style="max-height: 40vh; overflow-y: auto; padding-right: 0.5rem;"></div>
+                        </div>
+                    </div>
+                </aside>
+                <div id="diff-viewer-panel" class="custom-scrollbar">
+                    <div class="diff-no-selection empty-state-message">
+                        <p>Select a target from the list to view differences.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
