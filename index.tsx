@@ -7,6 +7,7 @@ import * as Diff from 'diff';
 import JSZip from 'jszip';
 import { GoogleGenAI, GenerateContentResponse, Part } from "@google/genai";
 import { OpenAIAPI } from "./openai-client";
+import { GeminiAPI } from "./gemini-client";
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
@@ -334,7 +335,7 @@ const temperatures = [0, 0.7, 1.0, 1.5, 2.0];
 let pipelinesState: PipelineState[] = [];
 let activeMathPipeline: MathPipelineState | null = null;
 let activeReactPipeline: ReactPipelineState | null = null; // Added for React mode
-let ai: GoogleGenAI | OpenAIAPI | null = null;
+let ai: GoogleGenAI | OpenAIAPI | GeminiAPI | null = null;
 let activePipelineId: number | null = null;
 let isGenerating = false;
 let currentMode: ApplicationMode = 'website';
@@ -532,11 +533,8 @@ function initializeApiKey() {
             }
 
             if (currentAIProvider === 'gemini') {
-                // @google/genai SDK v1.4.0 似乎只接受单个字符串密钥。
-                // 为了实现轮询，我们需要一个自定义的包装器，或者在每次调用时手动选择一个密钥。
-                // 目前，为了简单起见，我们只使用第一个密钥，但保留了多密钥解析的逻辑。
-                // 注意：一个更健壮的实现将需要一个类似于我们为OpenAI创建的轮询包装器。
-                ai = new GoogleGenAI({ apiKey: apiKeys[0] });
+                // 使用我们自定义的GeminiAPI类，它支持多密钥智能轮询
+                ai = new GeminiAPI(apiKeys);
             } else if (currentAIProvider === 'openai') {
                 const baseUrl = openaiBaseUrlInput.value || localStorage.getItem('openai-base-url') || undefined;
                 const modelName = openaiModelNameInput.value || localStorage.getItem('openai-model-name') || undefined;

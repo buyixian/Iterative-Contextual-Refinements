@@ -64,17 +64,10 @@ class ModelsModule {
   }
 
   /**
-   * 获取下一个API密钥（轮询机制）
-   */
-  private getNextApiKey(): string {
-    const key = this.apiKeys[this.currentKeyIndex];
-    // 更新索引以实现轮询
-    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
-    return key;
-  }
-
-  /**
    * Generate content using OpenAI-compatible API, compatible with Google GenAI SDK
+   * This method implements intelligent key rotation: if an API call fails due to
+   * authentication or quota issues (401, 403, 429), it will automatically try the next
+   * available API key until all keys are exhausted.
    */
   async generateContent(params: GenerateContentParameters): Promise<any> {
     // Convert Google GenAI parameters to OpenAI format
@@ -101,33 +94,53 @@ class ModelsModule {
     // Use the model specified in params, or fall back to the default model
     const modelToUse = params.model || this.modelName;
 
-    try {
-      // 获取当前API密钥
-      const currentApiKey = this.getNextApiKey();
+    // Try each API key in sequence until one succeeds or all fail
+    let lastError: any = null;
+    
+    for (let i = 0; i < this.apiKeys.length; i++) {
+      const currentApiKey = this.apiKeys[i];
       
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${currentApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: modelToUse,
-          ...openAIRequest,
-        }),
-      });
+      try {
+        const response = await fetch(`${this.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: modelToUse,
+            ...openAIRequest,
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        if (!response.ok) {
+          // If the error is related to authentication or quota, try the next key
+          if (response.status === 401 || response.status === 403 || response.status === 429) {
+            lastError = new Error(`OpenAI API error with key ${i + 1}: ${response.status} ${response.statusText}`);
+            console.warn(`API key ${i + 1} failed with status ${response.status}. Trying next key...`);
+            continue; // Try the next key
+          } else {
+            // For other errors (e.g., 5xx server errors), re-throw immediately
+            throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+          }
+        }
+
+        const openAIResponse: OpenAIChatCompletionResponse = await response.json();
+        
+        // Convert OpenAI response to Google GenAI format
+        return this.convertOpenAIResponseToGoogleGenAI(openAIResponse);
+      } catch (error) {
+        // If it's a network error or other unexpected error, try the next key
+        // We'll re-throw the last error if all keys fail
+        lastError = error;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn(`API key ${i + 1} failed with error: ${errorMessage}. Trying next key...`);
+        continue; // Try the next key
       }
-
-      const openAIResponse: OpenAIChatCompletionResponse = await response.json();
-      
-      // Convert OpenAI response to Google GenAI format
-      return this.convertOpenAIResponseToGoogleGenAI(openAIResponse);
-    } catch (error) {
-      throw error;
     }
+    
+    // If we've exhausted all keys, throw the last error we encountered
+    throw lastError || new Error("All API keys failed.");
   }
 
   private convertContentsToMessages(contents: any): any[] {
