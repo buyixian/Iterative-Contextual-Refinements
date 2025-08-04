@@ -6,6 +6,7 @@
 import * as Diff from 'diff';
 import JSZip from 'jszip';
 import { GoogleGenAI, GenerateContentResponse, Part } from "@google/genai";
+import { OpenAIAPI } from "./openai-client";
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
@@ -19,7 +20,6 @@ import {
     systemInstructionJsonOutputOnly, // Same as above
     systemInstructionTextOutputOnly   // Same as above
 } from './prompts.js';
-
 
 // Constants for retry logic
 const MAX_RETRIES = 3; // Max number of retries for API errors
@@ -38,6 +38,7 @@ class PipelineStopRequestedError extends Error {
 }
 
 type ApplicationMode = 'website' | 'creative' | 'math' | 'agent' | 'react';
+type AIProvider = 'gemini' | 'openai';
 
 interface AgentGeneratedPrompts {
     iteration_type_description: string;
@@ -333,7 +334,7 @@ const temperatures = [0, 0.7, 1.0, 1.5, 2.0];
 let pipelinesState: PipelineState[] = [];
 let activeMathPipeline: MathPipelineState | null = null;
 let activeReactPipeline: ReactPipelineState | null = null; // Added for React mode
-let ai: GoogleGenAI | null = null;
+let ai: GoogleGenAI | OpenAIAPI | null = null;
 let activePipelineId: number | null = null;
 let isGenerating = false;
 let currentMode: ApplicationMode = 'website';
@@ -350,11 +351,14 @@ let customPromptsAgentState: CustomizablePromptsAgent = createDefaultCustomPromp
 let customPromptsReactState: CustomizablePromptsReact = JSON.parse(JSON.stringify(defaultCustomPromptsReact)); // Added for React mode
 
 
-const apiKeyStatusElement = document.getElementById('api-key-status') as HTMLParagraphElement;
+const apiKeyStatusElement = document.getElementById('api-key-status') as HTMLElement;
 const apiKeyFormContainer = document.getElementById('api-key-form-container') as HTMLElement;
 const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement;
 const saveApiKeyButton = document.getElementById('save-api-key-button') as HTMLButtonElement;
 const clearApiKeyButton = document.getElementById('clear-api-key-button') as HTMLButtonElement;
+const openaiCustomConfig = document.getElementById('openai-custom-config') as HTMLElement;
+const openaiBaseUrlInput = document.getElementById('openai-base-url') as HTMLInputElement;
+const openaiModelNameInput = document.getElementById('openai-model-name') as HTMLInputElement;
 const initialIdeaInput = document.getElementById('initial-idea') as HTMLTextAreaElement;
 const initialIdeaLabel = document.getElementById('initial-idea-label') as HTMLLabelElement;
 const mathProblemImageInputContainer = document.getElementById('math-problem-image-input-container') as HTMLElement;
@@ -370,6 +374,8 @@ const pipelinesContentContainer = document.getElementById('pipelines-content-con
 const globalStatusDiv = document.getElementById('global-status') as HTMLElement;
 const pipelineSelectorsContainer = document.getElementById('pipeline-selectors-container') as HTMLElement;
 const appModeSelector = document.getElementById('app-mode-selector') as HTMLElement;
+const aiProviderSelector = document.getElementById('ai-provider-select') as HTMLSelectElement;
+
 
 // Prompts containers (now inside the modal)
 const websitePromptsContainer = document.getElementById('website-prompts-container') as HTMLElement;
@@ -455,12 +461,19 @@ function initializeApiKey() {
     let statusMessage = "";
     let isKeyAvailable = false;
     let currentApiKey: string | null = null;
+    let currentAIProvider = aiProviderSelector.value as AIProvider;
 
     // Hide form elements by default
     apiKeyFormContainer.style.display = 'none';
     saveApiKeyButton.style.display = 'none';
     clearApiKeyButton.style.display = 'none';
     apiKeyInput.style.display = 'none';
+    openaiCustomConfig.style.display = 'none';
+
+    // Show OpenAI custom config if OpenAI is selected
+    if (currentAIProvider === 'openai') {
+        openaiCustomConfig.style.display = 'flex';
+    }
 
     const envKey = process.env.API_KEY;
 
@@ -471,19 +484,35 @@ function initializeApiKey() {
         apiKeyStatusElement.className = 'api-key-status-message status-badge status-ok';
     } else {
         apiKeyFormContainer.style.display = 'flex'; // Show the container for input/buttons
-        const storedKey = localStorage.getItem('gemini-api-key');
-        if (storedKey) {
-            statusMessage = "Using API Key from local storage.";
+        const storedApiKey = localStorage.getItem(`${currentAIProvider}-api-key`);
+        const storedBaseUrl = localStorage.getItem('openai-base-url');
+        const storedModelName = localStorage.getItem('openai-model-name');
+        
+        if (storedApiKey) {
+            statusMessage = `Using API Key from local storage for ${currentAIProvider}.`;
             isKeyAvailable = true;
-            currentApiKey = storedKey;
+            currentApiKey = storedApiKey;
             apiKeyStatusElement.className = 'api-key-status-message status-badge status-ok';
             clearApiKeyButton.style.display = 'inline-flex'; // Show clear button
+            
+            // Load OpenAI custom settings
+            if (currentAIProvider === 'openai' && storedBaseUrl) {
+                openaiBaseUrlInput.value = storedBaseUrl;
+            }
+            if (currentAIProvider === 'openai' && storedModelName) {
+                openaiModelNameInput.value = storedModelName;
+            }
         } else {
             statusMessage = "API Key not found. Please provide one.";
             isKeyAvailable = false;
             apiKeyStatusElement.className = 'api-key-status-message status-badge status-error';
             apiKeyInput.style.display = 'block'; // Show input field
             saveApiKeyButton.style.display = 'inline-flex'; // Show save button
+            
+            // Show OpenAI custom config if OpenAI is selected
+            if (currentAIProvider === 'openai') {
+                openaiCustomConfig.style.display = 'flex';
+            }
         }
     }
 
@@ -493,11 +522,31 @@ function initializeApiKey() {
 
     if (isKeyAvailable && currentApiKey) {
         try {
-            ai = new GoogleGenAI({ apiKey: currentApiKey });
+            // 统一处理多密钥（逗号分隔）
+            const apiKeys = currentApiKey.includes(',')
+                ? currentApiKey.split(',').map(key => key.trim()).filter(key => key.length > 0)
+                : [currentApiKey];
+
+            if (apiKeys.length === 0) {
+                throw new Error("API key string is empty or contains only commas.");
+            }
+
+            if (currentAIProvider === 'gemini') {
+                // @google/genai SDK v1.4.0 似乎只接受单个字符串密钥。
+                // 为了实现轮询，我们需要一个自定义的包装器，或者在每次调用时手动选择一个密钥。
+                // 目前，为了简单起见，我们只使用第一个密钥，但保留了多密钥解析的逻辑。
+                // 注意：一个更健壮的实现将需要一个类似于我们为OpenAI创建的轮询包装器。
+                ai = new GoogleGenAI({ apiKey: apiKeys[0] });
+            } else if (currentAIProvider === 'openai') {
+                const baseUrl = openaiBaseUrlInput.value || localStorage.getItem('openai-base-url') || undefined;
+                const modelName = openaiModelNameInput.value || localStorage.getItem('openai-model-name') || undefined;
+                // 将解析后的密钥数组（或单个密钥的数组）传递给构造函数
+                ai = new OpenAIAPI({ apiKey: apiKeys.length > 1 ? apiKeys : apiKeys[0], baseUrl, modelName });
+            }
             if (generateButton) generateButton.disabled = isGenerating;
             return true;
         } catch (e: any) {
-            console.error("Failed to initialize GoogleGenAI:", e);
+            console.error(`Failed to initialize ${currentAIProvider} API:`, e);
             if (apiKeyStatusElement) {
                 apiKeyStatusElement.textContent = `API Init Error`;
                 apiKeyStatusElement.className = 'api-key-status-message status-badge status-error';
@@ -3802,8 +3851,15 @@ function aggregateReactOutputs() {
 // ----- END REACT MODE SPECIFIC FUNCTIONS -----
 
 
+// Initialize UI listeners
 function initializeUI() {
     initializeApiKey();
+
+    // Add AI provider change listener
+    aiProviderSelector.addEventListener('change', () => {
+        initializeApiKey();
+        updateControlsState();
+    });
 
     marked.setOptions({
         gfm: true,
@@ -3935,9 +3991,21 @@ function initializeUI() {
     // API Key Listeners
     saveApiKeyButton.addEventListener('click', () => {
         const key = apiKeyInput.value.trim();
+        const currentProvider = aiProviderSelector.value as AIProvider;
         if (key) {
-            localStorage.setItem('gemini-api-key', key);
+            localStorage.setItem(`${currentProvider}-api-key`, key);
+            
+            // Save OpenAI specific settings
+            if (currentProvider === 'openai') {
+                const baseUrl = openaiBaseUrlInput.value.trim();
+                const modelName = openaiModelNameInput.value.trim();
+                if (baseUrl) localStorage.setItem('openai-base-url', baseUrl);
+                if (modelName) localStorage.setItem('openai-model-name', modelName);
+            }
+            
             apiKeyInput.value = ''; // Clear input after save
+            openaiBaseUrlInput.value = '';
+            openaiModelNameInput.value = '';
             initializeApiKey(); // Re-initialize
             updateControlsState(); // Update button states
         } else {
@@ -3946,7 +4014,10 @@ function initializeUI() {
     });
 
     clearApiKeyButton.addEventListener('click', () => {
-        localStorage.removeItem('gemini-api-key');
+        const currentProvider = aiProviderSelector.value as AIProvider;
+        localStorage.removeItem(`${currentProvider}-api-key`);
+        localStorage.removeItem('openai-base-url');
+        localStorage.removeItem('openai-model-name');
         initializeApiKey(); // Re-initialize
         updateControlsState(); // Update button states
     });
