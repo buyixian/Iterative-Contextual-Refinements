@@ -57,26 +57,22 @@ export class GeminiAPI {
             const response = await this.clients[i].models.generateContent(params);
             return response;
           } catch (error: any) {
-            // Check if the error is related to authentication or quota
-            // Note: The exact error structure from @google/genai might differ from OpenAI's fetch response
-            // We'll assume it has a status property for HTTP-like errors, or check the message
-            const isAuthOrQuotaError = 
-              (error.status && (error.status === 401 || error.status === 403 || error.status === 429)) ||
-              (error.message && (
-                error.message.includes('API_KEY_INVALID') ||
-                error.message.includes('PERMISSION_DENIED') ||
-                error.message.includes('RESOURCE_EXHAUSTED')
-              ));
+            // Check if the error is a client-side error (like 400 Bad Request)
+            // that won't be solved by retrying with a different key.
+            const isClientError =
+              (error.status && error.status >= 400 && error.status < 500) &&
+              // Exclude auth/quota errors which we DO want to retry with the next key
+              !(error.status === 401 || error.status === 403 || error.status === 429);
 
-            if (isAuthOrQuotaError) {
-              lastError = error;
-              console.warn(`Gemini API key ${i + 1} failed with auth/quota error. Trying next key...`);
-              continue; // Try the next key
-            } else {
-              // For other errors (e.g., bad request, internal server error), re-throw immediately
-              // as they are unlikely to be resolved by trying a different key
-              console.error(`Gemini API key ${i + 1} failed with non-retryable error:`, error);
+            if (isClientError) {
+              // For client-side errors (e.g., invalid argument), re-throw immediately
+              console.error(`Gemini API key ${i + 1} failed with non-retryable client error:`, error);
               throw error;
+            } else {
+              // For server-side errors (5xx), network errors, or auth/quota errors, try the next key
+              lastError = error;
+              console.warn(`Gemini API key ${i + 1} failed with a potentially transient error (status: ${error.status}). Trying next key...`);
+              continue; // Try the next key
             }
           }
         }

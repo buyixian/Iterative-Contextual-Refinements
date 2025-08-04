@@ -41,6 +41,13 @@ class PipelineStopRequestedError extends Error {
 type ApplicationMode = 'website' | 'creative' | 'math' | 'agent' | 'react';
 type AIProvider = 'gemini' | 'openai';
 
+// 定义API客户端池管理器接口
+interface ApiClientPoolManager {
+  clients: (GoogleGenAI | OpenAIAPI | GeminiAPI)[];
+  currentIndex: number;
+  getNextClient(): GoogleGenAI | OpenAIAPI | GeminiAPI;
+}
+
 interface AgentGeneratedPrompts {
     iteration_type_description: string;
     expected_output_content_type: string; // e.g., "python", "text", "markdown"
@@ -335,7 +342,7 @@ const temperatures = [0, 0.7, 1.0, 1.5, 2.0];
 let pipelinesState: PipelineState[] = [];
 let activeMathPipeline: MathPipelineState | null = null;
 let activeReactPipeline: ReactPipelineState | null = null; // Added for React mode
-let ai: GoogleGenAI | OpenAIAPI | GeminiAPI | null = null;
+let aiPoolManager: ApiClientPoolManager | null = null;
 let activePipelineId: number | null = null;
 let isGenerating = false;
 let currentMode: ApplicationMode = 'website';
@@ -532,15 +539,33 @@ function initializeApiKey() {
                 throw new Error("API key string is empty or contains only commas.");
             }
 
+            // Create a pool of API clients, one for each key
+            const clients: (GoogleGenAI | OpenAIAPI | GeminiAPI)[] = [];
             if (currentAIProvider === 'gemini') {
-                // 使用我们自定义的GeminiAPI类，它支持多密钥智能轮询
-                ai = new GeminiAPI(apiKeys);
+                // For Google GenAI, create a separate client for each key
+                for (const key of apiKeys) {
+                    clients.push(new GoogleGenAI({ apiKey: key }));
+                }
             } else if (currentAIProvider === 'openai') {
                 const baseUrl = openaiBaseUrlInput.value || localStorage.getItem('openai-base-url') || undefined;
                 const modelName = openaiModelNameInput.value || localStorage.getItem('openai-model-name') || undefined;
-                // 将解析后的密钥数组（或单个密钥的数组）传递给构造函数
-                ai = new OpenAIAPI({ apiKey: apiKeys.length > 1 ? apiKeys : apiKeys[0], baseUrl, modelName });
+                // For OpenAI, create a separate client for each key
+                for (const key of apiKeys) {
+                    clients.push(new OpenAIAPI({ apiKey: key, baseUrl, modelName }));
+                }
             }
+
+            // Create the pool manager with the clients and a round-robin getNextClient function
+            aiPoolManager = {
+                clients,
+                currentIndex: 0,
+                getNextClient: function () {
+                    const client = this.clients[this.currentIndex];
+                    this.currentIndex = (this.currentIndex + 1) % this.clients.length;
+                    return client;
+                }
+            };
+
             if (generateButton) generateButton.disabled = isGenerating;
             return true;
         } catch (e: any) {
@@ -551,12 +576,12 @@ function initializeApiKey() {
                 apiKeyStatusElement.title = `Error: ${e.message}`;
             }
             if (generateButton) generateButton.disabled = true;
-            ai = null;
+            aiPoolManager = null;
             return false;
         }
     } else {
         if (generateButton) generateButton.disabled = true;
-        ai = null;
+        aiPoolManager = null;
         return false;
     }
 }
@@ -874,7 +899,7 @@ function updateControlsState() {
     const reactPipelineRunningOrStopping = activeReactPipeline?.status === 'orchestrating' || activeReactPipeline?.status === 'processing_workers' || activeReactPipeline?.status === 'stopping'; // Added for React
     isGenerating = anyPipelineRunningOrStopping || mathPipelineRunningOrStopping || reactPipelineRunningOrStopping; // Added reactPipeline
 
-    const isApiKeyReady = !!ai;
+    const isApiKeyReady = !!aiPoolManager;
 
     if (generateButton) {
         let disabled = isGenerating || !isApiKeyReady;
@@ -1464,14 +1489,16 @@ function updatePipelineStatusUI(pipelineId: number, status: PipelineState['statu
 }
 
 async function callGemini(promptOrParts: string | Part[], temperature: number, modelToUse: string, systemInstruction?: string, isJsonOutput: boolean = false): Promise<GenerateContentResponse> {
-    if (!ai) throw new Error("Gemini API client not initialized.");
+    if (!aiPoolManager) throw new Error("API client pool not initialized.");
 
     const contents: Part[] = typeof promptOrParts === 'string' ? [{ text: promptOrParts }] : promptOrParts;
     const config: any = { temperature };
     if (systemInstruction) config.systemInstruction = systemInstruction;
     if (isJsonOutput) config.responseMimeType = "application/json";
 
-    const response = await ai.models.generateContent({ model: modelToUse, contents: { parts: contents }, config: config });
+    // Get a client from the pool and use it for the API call
+    const client = aiPoolManager.getNextClient();
+    const response = await client.models.generateContent({ model: modelToUse, contents: { parts: contents }, config: config });
     return response;
 }
 
@@ -2243,7 +2270,7 @@ function handleImportConfiguration(event: Event) {
 
 
 async function startMathSolvingProcess(problemText: string, imageBase64?: string | null, imageMimeType?: string | null) {
-    if (!ai) {
+    if (!aiPoolManager) {
         return;
     }
     isGenerating = true;
@@ -3407,7 +3434,7 @@ function renderActiveMathPipeline() {
 // ---------- REACT MODE SPECIFIC FUNCTIONS ----------
 
 async function startReactModeProcess(userRequest: string) {
-    if (!ai) {
+    if (!aiPoolManager) {
         return;
     }
     isGenerating = true;
@@ -3874,7 +3901,7 @@ function initializeUI() {
 
     if (generateButton) {
         generateButton.addEventListener('click', async () => {
-            if (!ai) { // Double check if API client is not initialized
+            if (!aiPoolManager) { // Double check if API client is not initialized
                 alert("API Key is not configured. Please ensure the process.env.API_KEY is set or provide one manually.");
                 initializeApiKey(); // Try to re-initialize
                 return;
