@@ -1,0 +1,69 @@
+.mode-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mode-label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background-color: #e9ecef;
+  border-radius: 8px;
+}
+
+.radio-label {
+  flex: 1 1 auto;
+  display: inline-block;
+  padding: 0.5rem 0.75rem;
+  background-color: #fff;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.radio-label input[type="radio"] {
+  display: none;
+}
+
+.radio-label span {
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.radio-label:hover {
+  background-color: #f8f9fa;
+  border-color: #adb5bd;
+}
+
+.radio-label input[type="radio"]:checked + span {
+  font-weight: 600;
+  color: #007bff;
+}
+
+.radio-label input[type="radio"]:checked {
+  /* This is a bit of a trick to style the label itself when the radio is checked */
+  /* We can't use a sibling selector for the parent, so we style the span inside */
+  /* and can add styles to the label itself if needed, but often styling the text is enough */
+}
+
+/* A more direct way to style the label when checked, if you don't mind the extra element */
+.radio-label input[type="radio"]:checked ~ * {
+  /* This won't work as intended for the label itself */
+}
+
+/* The best way is to rely on the checked status to style the span, as done above. */
+/* For the label itself, we can do this: */
+.radio-label.checked {
+    background-color: #e7f1ff;
+    border-color: #007bff;
+}

@@ -1,0 +1,31 @@
+.pipeline-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid #ccc;
+}
+
+.tabs button {
+  padding: 10px 20px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tabs button.active {
+  border-bottom-color: #007bff;
+  font-weight: bold;
+}
+
+.tab-content {
+  flex-grow: 1;
+  padding: 20px;
+  background-color: #f9f9f9;
+}

@@ -1,0 +1,144 @@
+{
+  "workflow_id": "wf-adversarial-math",
+  "name": "对抗性数学推理工作流",
+  "description": "一个多智能体协同工作流，用于解决复杂的数学问题。不同的智能体扮演不同的角色，如策略家、战术家、求解者、证明者和改进者。",
+  "roles": [
+    {
+      "id": "strategist",
+      "name": "策略家",
+      "description": "生成高层次的解题策略。",
+      "system_prompt": "你是一位顶级的数学解题策略家。你的任务是分析一个复杂的数学问题，并提出多种不同角度、高层次的解题策略。不要深入细节，专注于提供概念性的路径和方法论。你的输出应该是一个包含多个策略的列表。"
+    },
+    {
+      "id": "tactician",
+      "name": "战术家",
+      "description": "将高层次策略分解为具体的战术步骤。",
+      "system_prompt": "你是一位严谨的数学战术家。你的任务是接收一个高层次的解题策略，并将其分解为一系列具体的、可执行的战术步骤。每个步骤都应该是清晰、明确且可操作的。你的输出应该是一个包含多个战术步骤的列表。"
+    },
+    {
+      "id": "solver",
+      "name": "求解者",
+      "description": "尝试根据战术直接解决问题。",
+      "system_prompt": "你是一位专注的数学求解者。你的任务是根据给定的战术步骤，尽最大努力解决问题。详细展示你的计算过程和推理逻辑。如果遇到困难，清晰地说明你卡在了哪里。"
+    },
+    {
+      "id": "conjecturer",
+      "name": "猜想家",
+      "description": "提出解决问题所需的关键假设或猜想。",
+      "system_prompt": "你是一位富有创造力的数学家，擅长提出猜想。你的任务是分析一个数学问题，并提出可能有助于解决它的关键猜想或引理。你的猜想应该是大胆而有根据的。"
+    },
+    {
+      "id": "prover",
+      "name": "证明者",
+      "description": "尝试证明一个给定的假设。",
+      "system_prompt": "你是一位逻辑严密的数学证明者。你的任务是接收一个数学假设，并严格地尝试证明它。你的证明过程必须是清晰、有条理且无懈可击的。"
+    },
+    {
+      "id": "disprover",
+      "name": "反驳者",
+      "description": "尝试证伪（反驳）一个给定的假设。",
+      "system_prompt": "你是一位持怀疑态度的数学家，擅长寻找反例。你的任务是接收一个数学假设，并尽力去证伪它。寻找极端情况、边界条件或构造一个明确的反例来反驳这个假设。"
+    },
+    {
+      "id": "improver",
+      "name": "改进者",
+      "description": "整合所有结果，改进并给出最终答案。",
+      "system_prompt": "你是一位资深的数学家和沟通者。你的任务是审查所有其他角色的工作成果——包括策略、战术、解题尝试、证明和反驳。综合所有信息，提炼出一个最完整、最优雅的最终答案，并清晰地解释你的推理过程。"
+    }
+  ],
+  "stages": [
+    {
+      "stage_id": "stage-1-strategies",
+      "name": "生成宏观策略",
+      "steps": [
+        {
+          "step_id": "step-1.1-gen-strategies",
+          "tasks": [
+            {
+              "task_id": "task-1.1.1-gen-strategies",
+              "role": "strategist",
+              "prompt_template": "为问题 '{{context.initial_request}}' 生成 3 个不同的解题策略。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage_id": "stage-2-decompose",
+      "name": "分解为战术",
+      "for_each": "strategy in $.stages['stage-1-strategies'].output['task-1.1.1-gen-strategies'].strategies",
+      "steps": [
+        {
+          "step_id": "step-2.1-gen-sub-strategies",
+          "tasks": [
+            {
+              "task_id": "task-2.1.1-gen-sub-strategies",
+              "role": "tactician",
+              "prompt_template": "将策略 '{{strategy}}' 分解为 3 个不同的战术。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage_id": "stage-3-solve-and-hypothesize",
+      "name": "并行求解与假设",
+      "for_each": "sub_strategy in $.stages['stage-2-decompose'].output['task-2.1.1-gen-sub-strategies'].sub_strategies",
+      "steps": [
+        {
+          "step_id": "step-3.1-parallel-tasks",
+          "tasks": [
+            {
+              "task_id": "task-3.1.1-solve",
+              "role": "solver",
+              "prompt_template": "尝试根据战术 '{{sub_strategy}}' 解决问题。"
+            },
+            {
+              "task_id": "task-3.1.2-hypothesize",
+              "role": "conjecturer",
+              "prompt_template": "根据问题 '{{context.initial_request}}' 提出 3 个关键假设。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage_id": "stage-4-adversarial-check",
+      "name": "对抗性检验假设",
+      "for_each": "hypothesis in $.stages['stage-3-solve-and-hypothesize'].output['task-3.1.2-hypothesize'].hypotheses",
+      "steps": [
+        {
+          "step_id": "step-4.1-prove-disprove",
+          "tasks": [
+            {
+              "task_id": "task-4.1.1-prove",
+              "role": "prover",
+              "prompt_template": "尝试证明假设 '{{hypothesis}}'。"
+            },
+            {
+              "task_id": "task-4.1.2-disprove",
+              "role": "disprover",
+              "prompt_template": "尝试证伪假设 '{{hypothesis}}'。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage_id": "stage-5-improve",
+      "name": "整合与自我改进",
+      "steps": [
+        {
+          "step_id": "step-5.1-improve-solution",
+          "tasks": [
+            {
+              "task_id": "task-5.1.1-improve",
+              "role": "improver",
+              "prompt_template": "结合解题尝试 '{{context.stages['stage-3-solve-and-hypothesize'].output.solutions}}' 和假设检验结果 '{{context.stages['stage-4-adversarial-check'].output}}'，改进最终解法。"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

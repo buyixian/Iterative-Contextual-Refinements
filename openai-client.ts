@@ -1,0 +1,230 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
+ * Type definitions for OpenAI API response
+ */
+interface OpenAIChatCompletionMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+interface OpenAIChatCompletionChoice {
+  index: number;
+  message: OpenAIChatCompletionMessage;
+  finish_reason: string;
+}
+
+interface OpenAIChatCompletionResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: OpenAIChatCompletionChoice[];
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface OpenAIConfig {
+  apiKey: string | string[];
+  baseUrl?: string;
+  modelName?: string;
+}
+
+/**
+ * Google GenAI compatible parameters
+ */
+export interface GenerateContentParameters {
+  model: string;
+  contents: any;
+  config?: any;
+}
+
+/**
+ * Models module that implements the generateContent method
+ */
+class ModelsModule {
+  private apiKeys: string[];
+  private currentKeyIndex: number;
+  private baseUrl: string;
+  private modelName: string;
+
+  constructor(apiKey: string | string[], baseUrl: string, modelName: string) {
+    this.apiKeys = Array.isArray(apiKey) ? apiKey : [apiKey];
+    this.currentKeyIndex = 0;
+    this.baseUrl = baseUrl;
+    this.modelName = modelName;
+  }
+
+  /**
+   * Generate content using OpenAI-compatible API, compatible with Google GenAI SDK
+   * This method implements intelligent key rotation: if an API call fails due to
+   * authentication or quota issues (401, 403, 429), it will automatically try the next
+   * available API key until all keys are exhausted.
+   */
+  async generateContent(params: GenerateContentParameters): Promise<any> {
+    // Convert Google GenAI parameters to OpenAI format.
+    const openAIRequest: any = {
+      messages: this.convertContentsToMessages(params.contents),
+      temperature: params.config?.temperature,
+      stream: false, // Keep this for general compatibility
+    };
+
+    // Add system instruction if provided
+    if (params.config?.systemInstruction) {
+      openAIRequest.messages.unshift({
+        role: 'system',
+        content: typeof params.config.systemInstruction === 'string'
+          ? params.config.systemInstruction
+          : params.config.systemInstruction.parts?.map((part: any) => part.text).join('') || ''
+      });
+    }
+
+    // Handle JSON response format
+    if (params.config?.responseMimeType === "application/json") {
+      openAIRequest.response_format = { type: "json_object" };
+    }
+
+    // Use the model specified in params, or fall back to the default model
+    let modelToUse = params.model || this.modelName;
+
+    // Try each API key in sequence until one succeeds or all fail
+    let lastError: any = null;
+    
+    for (let i = 0; i < this.apiKeys.length; i++) {
+      const currentApiKey = this.apiKeys[i];
+      
+      try {
+        // If we are using the proxy, the URL is just the base URL. Otherwise, append the path.
+        const fetchUrl = `${this.baseUrl}/chat/completions`;
+        const response = await fetch(fetchUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: modelToUse,
+            ...openAIRequest,
+          }),
+        });
+
+        if (!response.ok) {
+          // If the error is related to authentication or quota, try the next key
+          if (response.status === 401 || response.status === 403 || response.status === 429) {
+            lastError = new Error(`OpenAI API error with key ${i + 1}: ${response.status} ${response.statusText}`);
+            console.warn(`API key ${i + 1} failed with status ${response.status}. Trying next key...`);
+            continue; // Try the next key
+          } else {
+            // For other errors (e.g., 5xx server errors), re-throw immediately
+            const errorText = await response.text();
+            throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorText}`);
+          }
+        }
+
+        const openAIResponse: OpenAIChatCompletionResponse = await response.json();
+        
+        // Convert OpenAI response to Google GenAI format
+        return this.convertOpenAIResponseToGoogleGenAI(openAIResponse);
+      } catch (error) {
+        // If it's a network error or other unexpected error, try the next key
+        // We'll re-throw the last error if all keys fail
+        lastError = error;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn(`API key ${i + 1} failed with error: ${errorMessage}. Trying next key...`);
+        continue; // Try the next key
+      }
+    }
+    
+    // If we've exhausted all keys, throw the last error we encountered
+    throw lastError || new Error("All API keys failed.");
+  }
+
+  private convertContentsToMessages(contents: any): any[] {
+    if (typeof contents === 'string') {
+      return [{ role: 'user', content: contents }];
+    }
+
+    if (Array.isArray(contents)) {
+      // Handle array of parts
+      const textParts = contents.filter((part: any) => part.text).map((part: any) => part.text).join('');
+      return [{ role: 'user', content: textParts }];
+    }
+
+    // Handle ContentListUnion
+    if (contents.parts) {
+      const textParts = contents.parts.filter((part: any) => part.text).map((part: any) => part.text).join('');
+      return [{ role: 'user', content: textParts }];
+    }
+
+    // Handle single part
+    if (contents.text) {
+      return [{ role: 'user', content: contents.text }];
+    }
+
+    return [{ role: 'user', content: JSON.stringify(contents) }];
+  }
+
+  private convertOpenAIResponseToGoogleGenAI(openAIResponse: OpenAIChatCompletionResponse): any {
+    const choice = openAIResponse.choices[0];
+    if (!choice || !choice.message || typeof choice.message.content !== 'string') {
+      throw new Error(`Invalid response format from API: ${JSON.stringify(openAIResponse)}`);
+    }
+
+    // Create a Google GenAI compatible response object
+    const response: any = {
+      text: () => choice.message.content,
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text: choice.message.content
+              }
+            ],
+            role: choice.message.role
+          }
+        }
+      ],
+      // Add getter methods for other properties
+      get data() { return undefined; },
+      get functionCalls() { return undefined; },
+      get executableCode() { return undefined; },
+      get codeExecutionResult() { return undefined; }
+    };
+
+    return response;
+  }
+}
+
+/**
+ * A minimal OpenAI-compatible API client with Google GenAI SDK compatibility
+ * This class implements the same interface as GoogleGenAI to act as an adapter
+ */
+export class OpenAIAPI {
+  public models: ModelsModule;
+  // Add dummy properties to match GoogleGenAI interface
+  public apiClient: any = null;
+  public vertexai: boolean = false;
+  public live: any = null;
+  public batches: any = null;
+  public chats: any = null;
+  public caches: any = null;
+  public files: any = null;
+  public operations: any = null;
+  public authTokens: any = null;
+  public tunings: any = null;
+
+  constructor(config: OpenAIConfig) {
+    const apiKey = config.apiKey;
+    const baseUrl = config.baseUrl || 'https://api.openai.com/v1';
+    const modelName = config.modelName || 'gpt-4-turbo';
+    
+    this.models = new ModelsModule(apiKey, baseUrl, modelName);
+  }
+}

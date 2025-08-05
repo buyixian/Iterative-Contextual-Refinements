@@ -1,0 +1,53 @@
+.role-assignment-container {
+  background-color: #f7f7f7;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.role-assignment-title {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.1em;
+  color: #333;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 8px;
+}
+
+.role-assignment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.role-assignment-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.role-label {
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 6px;
+  font-size: 0.9em;
+  cursor: help;
+}
+
+.role-select {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  font-size: 1em;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.role-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}

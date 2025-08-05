@@ -1,0 +1,17 @@
+[
+  {
+    "id": "gemini-1.5-pro",
+    "name": "Google Gemini 1.5 Pro",
+    "provider": "google"
+  },
+  {
+    "id": "deepseek-chat",
+    "name": "DeepSeek Chat",
+    "provider": "openai_compatible"
+  },
+  {
+    "id": "deepseek-reasoner",
+    "name": "DeepSeek Reasoner",
+    "provider": "openai_compatible"
+  }
+]
