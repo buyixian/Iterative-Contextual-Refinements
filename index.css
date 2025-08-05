@@ -1474,6 +1474,49 @@ summary.prompt-group-title::-webkit-details-marker { display: none; }
     background-color: var(--border-color);
     margin: 1.5rem 0;
 }
+/* Math Mode Judging Progress and Controls */
+.math-judging-progress {
+    background-color: rgba(var(--card-bg-base-rgb), 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.progress-info {
+    margin-bottom: 1rem;
+}
+
+.progress-info p {
+    margin: 0.5rem 0;
+    color: var(--text-secondary-color);
+}
+
+.progress-info p:first-child {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.judging-controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.judging-controls .button {
+    padding: 0.75rem 1.5rem;
+}
+
+.judging-controls .button.primary-action {
+    background-color: rgba(var(--accent-purple-rgb), 0.15);
+    border-color: var(--accent-purple);
+    color: var(--accent-purple);
+}
+
+.judging-controls .button.primary-action:hover {
+    background-color: rgba(var(--accent-purple-rgb), 0.25);
+    box-shadow: 0 0 10px rgba(var(--accent-purple-rgb), 0.3);
+}
 
 
 /* React Mode Specific Layout */
