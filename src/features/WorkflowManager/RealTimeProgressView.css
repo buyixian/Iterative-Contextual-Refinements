@@ -64,7 +64,7 @@
     border-radius: 4px;
 }
 
-.task-output, .task-error {
+.task-output, .task-error, .task-validation-status, .task-validation-message {
     background-color: #1e1e1e;
     border: 1px solid #3c3c3c;
     padding: 5px;
@@ -74,7 +74,48 @@
     font-size: 0.85em;
 }
 
-.task-error {
+.task-error, .task-validation-message {
     color: #f48771;
     border-color: #f48771;
+}
+.task-validation-status {
+    color: #4ec9b0; /* A greenish color for validation success, can be changed */
+}
+
+.iteration-container {
+    padding-left: 20px;
+    border-left: 2px solid #555;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.iteration-node {
+    background-color: #252526;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.iteration-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #3c3c3c;
+}
+
+.iteration-header span {
+    flex: 1;
+    min-width: 150px;
+}
+
+.iteration-details {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }

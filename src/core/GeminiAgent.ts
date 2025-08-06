@@ -31,9 +31,10 @@ export class GeminiAgent implements IAgent {
      * Executes the agent's task by calling the Gemini REST API.
      * @param prompt The input prompt for the agent.
      * @param context The current workflow context (unused by this agent for now).
+     * @param options Optional parameters for the execution, such as sampling settings.
      * @returns The text response from the model.
      */
-    async execute(prompt: string, context: WorkflowContext): Promise<string> {
+    async execute(prompt: string, context: WorkflowContext, options?: { temperature?: number }): Promise<string> {
         console.log(`GeminiAgent (${this.model.name}) executing with model ${this.model.id} via REST API...`);
         
         const requestBody = {
@@ -46,7 +47,10 @@ export class GeminiAgent implements IAgent {
                 parts: [{
                     text: prompt
                 }]
-            }]
+            }],
+            generationConfig: {
+                temperature: options?.temperature ?? 0.7 // Default temperature
+            }
         };
 
         try {

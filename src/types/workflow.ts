@@ -23,6 +23,18 @@ export interface Task {
   task_id: string;
   role: string; // The role this task fulfills, e.g., "proposer", "critiquer"
   prompt_template: string; // Uses {{...}} for variable substitution from context
+  // Optional validation and retry configuration for the task's output
+  required_sections?: string[];
+  require_upstream_references?: boolean;
+  topic_anchor_policy?: {
+    min_hits: number;
+    banned_hits: number;
+  };
+  reproducibility_requirements?: string[];
+  retry_policy?: {
+    max_attempts: number;
+    backoff: 'linear' | 'exponential';
+  };
 }
 
 /**
@@ -75,6 +87,19 @@ export interface WorkflowContext {
 }
 
 /**
+ * Represents the result of a single iteration in a for_each loop
+ */
+export interface IterationResult {
+  index: number;
+  loopVar: string;
+  loopVarValue: any;
+  startedAt: number;
+  endedAt: number;
+  durationMs: number;
+  stepOutputs: Record<string, any>;
+}
+
+/**
  * Represents the live, running state of a workflow instance.
  */
 export interface WorkflowState {
@@ -93,6 +118,7 @@ export interface WorkflowState {
               status: 'pending' | 'running' | 'completed' | 'failed';
               output?: any;
               error?: string;
+              attempt?: number; // Track the number of attempts for retry logic
             };
           };
         };
@@ -118,7 +144,8 @@ export interface IAgent {
    * Executes a task based on a given prompt and context.
    * @param prompt The final, rendered prompt to be sent to the model.
    * @param context The current state of the workflow for additional context.
+   * @param options Optional parameters for the execution, such as sampling settings.
    * @returns A promise that resolves to the string output from the model.
    */
-  execute(prompt: string, context: WorkflowContext): Promise<string>;
+  execute(prompt: string, context: WorkflowContext, options?: { temperature?: number }): Promise<string>;
 }

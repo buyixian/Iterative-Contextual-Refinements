@@ -1,0 +1,54 @@
+{
+  "workflow_id": "wf-minimal-for-each",
+  "name": "Minimal For-Each 测试工作流",
+  "description": "一个最小的测试工作流，用于验证 for_each 功能是否正常工作。",
+  "roles": [
+    {
+      "id": "generator",
+      "name": "生成器",
+      "description": "生成初始策略列表。",
+      "system_prompt": "你是一个列表生成器。请生成一个包含3个字符串元素的数组，作为测试数据。你的输出必须是严格的JSON格式：{\"strategies\": [\"策略A\", \"策略B\", \"策略C\"]}，其中strategies是一个包含多个策略字符串的数组。"
+    },
+    {
+      "id": "echo",
+      "name": "回显器",
+      "description": "回显输入的每个元素。",
+      "system_prompt": "你是一个回显器。请将输入的{{strategy}}元素直接回显到输出中。你的输出必须是严格的JSON格式：{\"echoed\": \"{{strategy}}\"}，其中echoed是回显的策略字符串。"
+    }
+  ],
+  "stages": [
+    {
+      "stage_id": "stage-1-generate",
+      "name": "生成策略列表",
+      "steps": [
+        {
+          "step_id": "step-1.1-generate",
+          "tasks": [
+            {
+              "task_id": "task-1.1.1-generate",
+              "role": "generator",
+              "prompt_template": "生成一个包含3个策略的数组。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage_id": "stage-2-echo",
+      "name": "回显每个策略",
+      "for_each": "strategy in $.stages['stage-1-generate'].output['task-1.1.1-generate'].strategies",
+      "steps": [
+        {
+          "step_id": "step-2.1-echo",
+          "tasks": [
+            {
+              "task_id": "task-2.1.1-echo",
+              "role": "echo",
+              "prompt_template": "回显策略: {{strategy}}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

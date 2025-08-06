@@ -101,7 +101,7 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
-const PORT = 3001;
+const PORT = 3002;
 server.listen(PORT, () => {
     console.log(`[PROXY] Generic CORS Proxy server running on http://localhost:${PORT}`);
     console.log(`[PROXY] Usage: http://localhost:${PORT}/<target_url>`);

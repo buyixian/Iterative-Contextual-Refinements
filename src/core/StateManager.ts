@@ -112,20 +112,23 @@ export class StateManager {
      * @param status The new status.
      * @param output Optional output from the task.
      * @param error Optional error message if the task failed.
+     * @param attempt Optional attempt number for retry logic.
      */
     public setTaskState(
-        stageId: string, 
-        stepId: string, 
-        taskId: string, 
+        stageId: string,
+        stepId: string,
+        taskId: string,
         status: WorkflowState['progress'][string]['steps'][string]['tasks'][string]['status'],
         output?: any,
-        error?: string
+        error?: string,
+        attempt?: number
     ) {
         const taskState = this.state.progress[stageId]?.steps[stepId]?.tasks[taskId];
         if (taskState) {
             taskState.status = status;
             if (output !== undefined) taskState.output = output;
             if (error !== undefined) taskState.error = error;
+            if (attempt !== undefined) taskState.attempt = attempt;
         }
     }
 

@@ -1,0 +1,54 @@
+{
+  "workflow_id": "wf-debug-probe",
+  "name": "调试探针工作流",
+  "description": "一个用于诊断上下文注入问题的最小化工作流。",
+  "roles": [
+    {
+      "id": "strategist",
+      "name": "策略家",
+      "description": "生成固定的测试策略。",
+      "system_prompt": "你是一个测试机器人。你必须严格地、一字不差地返回以下JSON：{\"strategies\": [\"test_strategy_1\", \"test_strategy_2\"]}"
+    },
+    {
+      "id": "debugger",
+      "name": "调试员",
+      "description": "原样返回它收到的上下文信息。",
+      "system_prompt": "你是一个调试机器人。你的任务是原样返回你收到的所有信息。不要添加任何额外的解释或格式。直接返回你收到的输入。"
+    }
+  ],
+  "stages": [
+    {
+      "stage_id": "stage-1-generate-data",
+      "name": "1. 生成测试数据",
+      "steps": [
+        {
+          "step_id": "step-1.1",
+          "tasks": [
+            {
+              "task_id": "task-1.1.1-generate",
+              "role": "strategist",
+              "prompt_template": "生成固定的测试数据。",
+              "output_key": "probe_output"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage_id": "stage-2-consume-data",
+      "name": "2. 消费测试数据",
+      "steps": [
+        {
+          "step_id": "step-2.1",
+          "tasks": [
+            {
+              "task_id": "task-2.1.1-consume",
+              "role": "debugger",
+              "prompt_template": "这是我收到的策略数据：{{context.probe_output.strategies}}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

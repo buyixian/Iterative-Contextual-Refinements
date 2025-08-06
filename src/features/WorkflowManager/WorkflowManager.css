@@ -50,3 +50,22 @@
 .workflow-controls button:hover:not(:disabled) {
     background-color: #88eaff;
 }
+
+.workflow-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.workflow-selector label {
+    font-weight: bold;
+}
+
+.workflow-selector select {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 8px;
+    font-family: inherit;
+}

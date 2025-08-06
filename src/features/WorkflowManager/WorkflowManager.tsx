@@ -15,6 +15,7 @@ export const WorkflowManager: React.FC = () => {
     const [initialRequest, setInitialRequest] = useState('');
     const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
     const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
+    const [availableWorkflows, setAvailableWorkflows] = useState<Workflow[]>([]);
     const [models, setModels] = useState<ModelDefinition[]>([]);
     const [roleAssignments, setRoleAssignments] = useState<Record<string, string>>({});
     
@@ -23,18 +24,28 @@ export const WorkflowManager: React.FC = () => {
 
     useEffect(() => {
         const loadInitialData = async () => {
-            const workflowModule = await import('../../workflows/adversarial-math.workflow.json');
-            const workflow: Workflow = workflowModule.default;
-            setSelectedWorkflow(workflow);
+            // Load available workflows
+            const adversarialMathWorkflowModule = await import('../../workflows/adversarial-math.workflow.json');
+            const adversarialMathWorkflow: Workflow = adversarialMathWorkflowModule.default;
+            
+            const minimalForEachWorkflowModule = await import('../../workflows/minimal-for-each.workflow.json');
+            const minimalForEachWorkflow: Workflow = minimalForEachWorkflowModule.default;
+
+            const debugProbeWorkflowModule = await import('../../workflows/debug-probe.workflow.json');
+            const debugProbeWorkflow: Workflow = debugProbeWorkflowModule.default;
+            
+            const workflows = [adversarialMathWorkflow, minimalForEachWorkflow, debugProbeWorkflow];
+            setAvailableWorkflows(workflows);
+            setSelectedWorkflow(debugProbeWorkflow);
 
             const modelsModule = await import('../../config/models.json');
             const availableModels: ModelDefinition[] = modelsModule.default as ModelDefinition[];
             setModels(availableModels);
 
             // Set default assignments once both workflow and models are loaded
-            if (workflow.roles && workflow.roles.length > 0 && availableModels.length > 0) {
+            if (adversarialMathWorkflow.roles && adversarialMathWorkflow.roles.length > 0 && availableModels.length > 0) {
                 const defaultAssignments: Record<string, string> = {};
-                workflow.roles.forEach(role => {
+                adversarialMathWorkflow.roles.forEach(role => {
                     defaultAssignments[role.id] = availableModels[0].id;
                 });
                 setRoleAssignments(defaultAssignments);
@@ -45,6 +56,21 @@ export const WorkflowManager: React.FC = () => {
 
     const handleAssignmentChange = (roleId: string, modelId: string) => {
         setRoleAssignments(prev => ({ ...prev, [roleId]: modelId }));
+    };
+    
+    const handleWorkflowChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const workflowId = event.target.value;
+        const workflow = availableWorkflows.find(w => w.workflow_id === workflowId);
+        if (workflow) {
+            setSelectedWorkflow(workflow);
+            
+            // Reset role assignments for the new workflow
+            const defaultAssignments: Record<string, string> = {};
+            workflow.roles.forEach(role => {
+                defaultAssignments[role.id] = models[0]?.id || '';
+            });
+            setRoleAssignments(defaultAssignments);
+        }
     };
 
     const handleRunWorkflow = async () => {
@@ -106,6 +132,17 @@ export const WorkflowManager: React.FC = () => {
         <div className="workflow-manager">
             <h2>工作流管理器</h2>
             <p>此面板用于启动和监控基于新架构的工作流。</p>
+            
+            <div className="workflow-selector">
+                <label htmlFor="workflow-select">选择工作流:</label>
+                <select id="workflow-select" value={selectedWorkflow?.workflow_id || ''} onChange={handleWorkflowChange}>
+                    {availableWorkflows.map(workflow => (
+                        <option key={workflow.workflow_id} value={workflow.workflow_id}>
+                            {workflow.name}
+                        </option>
+                    ))}
+                </select>
+            </div>
             
             {selectedWorkflow && models.length > 0 && (
                 <RoleAssignment
